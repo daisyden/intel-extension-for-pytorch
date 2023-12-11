@@ -324,6 +324,10 @@ at::Tensor AtenIpexJITDev::dil_convolution_instancenorm_relu(
     const at::Tensor& in_weight,
     const at::Tensor& in_bias) {
 
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION("AtenIpexJITDev::dil_convolution_instancenorm_relu", std::vector<c10::IValue>({}));
+#endif
+
   if (check_auto_mix_int8_fp32() && check_int8_calibration()) {
     auto dil_input = try_gen_dil_tensor(input);
     auto dil_weight = try_gen_dil_tensor(weight);
@@ -411,6 +415,9 @@ at::Tensor AtenIpexJITDev::dil_deconvolution3d(
     int64_t groups,
     at::IntArrayRef dilation
     ) {
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION("AtenIpexJITDev::dil_deconvolution3d", std::vector<c10::IValue>({}));
+#endif
 
   auto weight_dil_type = dbl::comm::try_gen_dil_tensor(weight).is_public_format();
   if (weight_dil_type) { weight.transpose_(0, 1); }
@@ -454,7 +461,10 @@ at::Tensor AtenIpexJITDev::dil_deconvolution3d(
             input_scale[0], output_scale[0], weights_scales_in);
     attr.set_output_scales(2, op_scales);
   }
-  
+
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION("dbl::deconv::deconvolution_impl", std::vector<c10::IValue>({}));
+#endif
   dil::tensor dil_output = dbl::deconv::deconvolution_impl(dil_input, dil_weight, dil_bias, padding, padding_r, output_padding, stride, dilation, groups, attr);
   auto aten_output = dbl::comm::gen_aten_tensor_by(std::move(dil_output));
 
@@ -483,6 +493,10 @@ Ipex_concat ipex_concat;
 
 at::Tensor AtenIpexJITDev::dil_concat3d(const at::TensorList tensors, const int64_t dim)
 {
+#if defined(IPEX_PROFILE_OP)
+  RECORD_FUNCTION("AtenIpexJITDev::dil_concat3d", std::vector<c10::IValue>({}));
+#endif
+
   auto t1_ = dbl::comm::try_gen_dil_tensor(tensors[0]).get_data_type();
   if (t1_ == dil::data_type::f32)
   {

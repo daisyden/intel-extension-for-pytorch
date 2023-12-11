@@ -267,6 +267,10 @@ at::Tensor instnorm_channel_last(const at::Tensor& input, const at::Tensor& weig
 
 dil::tensor dil_instnorm_channel_last(const dil::tensor& input, const at::Tensor& weight, const at::Tensor& bias, float i_scale, float o_scale) 
 {
+#if defined(IPEX_PROFILE_OP)
+RECORD_FUNCTION("dil_instnorm_channel_last", std::vector<c10::IValue>({}));
+#endif
+
   auto in_sz = input.get_dims();
   auto batch = in_sz[0];
   auto channel = in_sz[1];
@@ -594,6 +598,10 @@ void i_instancenorm_tpp<16>::ref_concat32(int8_t *in1, int8_t *in2, int8_t *out,
 
 void my_concat(const dil::tensor& input1, const dil::tensor& input2, dil::tensor& output, int dim)
 {
+#if defined(IPEX_PROFILE_OP)
+RECORD_FUNCTION("my_concat", std::vector<c10::IValue>({}));
+#endif
+
   auto in_sz = input1.get_dims();
   auto channel = in_sz[1];
   auto reduce_l = in_sz[0] * in_sz[2] * in_sz[3] * in_sz[4];
