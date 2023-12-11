@@ -303,6 +303,12 @@ OpFuser::RuleTab OpFuser::dnnlRules = {
 };
 
 void FusionPass(std::shared_ptr<Graph> &graph) {
+  graph_rewrite::FuseConvolutionWithInstanceNormAndRelu(graph);
+
+  graph_rewrite::ReplaceAtenDeConvWithIPEXDeconv(graph);
+
+  graph_rewrite::ReplaceAtenCatWithIPEXCat(graph);
+  
   // Replace _convolution with conv2d or conv3d
   graph_rewrite::replaceConvolutionWithAtenConv(graph);
 

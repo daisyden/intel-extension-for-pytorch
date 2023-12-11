@@ -37,7 +37,7 @@ struct convolution_transpose_forward : public dnnl::deconvolution_forward {
                       int groups = 1,
                       const attr_t& attr = attr_t(),
                       algorithm aalgorithm = algorithm::deconvolution_direct,
-                      prop_kind aprop_kind = prop_kind::forward,
+                      prop_kind aprop_kind = prop_kind::forward_inference,
                       const engine& aengine = engine::cpu_engine()) {
     static tensor dummy_bias;
     compute_impl</*with_bias=*/false>(
@@ -65,7 +65,7 @@ struct convolution_transpose_forward : public dnnl::deconvolution_forward {
     auto weights_dims_g =
         grouped ? utils::group_dims(weights_dims, groups) : weights_dims;
     // (g)iohw -> (g)oihw
-    std::swap(weights_dims_g[grouped + 0], weights_dims_g[grouped + 1]);
+    // std::swap(weights_dims_g[grouped + 0], weights_dims_g[grouped + 1]);
     auto weights_desc = tensor::desc(weights_dims_g, dtype);
 
     auto dims_in = weights_desc.get_dims();
@@ -91,8 +91,8 @@ struct convolution_transpose_forward : public dnnl::deconvolution_forward {
       y_dims = dst_dims;
     }
 
-    auto x_dtype = (dtype != data_type::s8) ? dtype : data_type::u8;
-    auto y_dtype = (dtype != data_type::s8) ? dtype : data_type::s32;
+    auto x_dtype = (dtype != data_type::s8) ? dtype : data_type::s8;
+    auto y_dtype = (dtype != data_type::s8) ? dtype : data_type::s8;
     tensor::desc src_desc(x_dims, x_dtype);
     tensor::desc dst_desc(y_dims, y_dtype);
 
@@ -112,10 +112,10 @@ struct convolution_transpose_forward : public dnnl::deconvolution_forward {
     // embed group info into weights_desc
     if (grouped) {
       // [g, o, i/g, ...] -> [g, i/g, o, ...]
-      return tensor::desc(pd.weights_desc(), groups).transpose(1, 2);
+      return tensor::desc(pd.weights_desc(), groups);
     } else {
       // [o, i, ...] -> [i, o, ...]
-      return tensor::desc(pd.weights_desc(), groups).transpose(0, 1);
+      return tensor::desc(pd.weights_desc(), groups);
     } 
   }
 
@@ -169,11 +169,11 @@ struct convolution_transpose_forward : public dnnl::deconvolution_forward {
                            const engine& aengine) {
 
     // make weights and dilates compatible with DNNL
-    auto weights_ = weights.make_grouped_weights(groups, true);
+    auto weights_ = weights.make_grouped_weights(groups);
     auto dilates_ = utils::get_compatible_dilates(dilates);
 
     // align weights data type with src
-    data_type dst_data_type = src.get_data_type() == data_type::bf16 ? data_type::bf16
+    data_type dst_data_type = src.get_data_type() == data_type::s8 ? data_type::s8
                                                         : data_type::f32;
     auto src_desc = src.get_desc().to_format_any().to_type(dst_data_type);
     auto weights_desc = weights_.get_desc().to_format_any().to_type(dst_data_type);

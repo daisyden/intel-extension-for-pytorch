@@ -48,6 +48,17 @@ void prepack_deconv_weights(
     int64_t groups,
     bool with_bias);
 
+void prepack_deconv3d_weights(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    std::vector<int64_t>  padding_r,
+    at::IntArrayRef output_padding,
+    at::IntArrayRef dilation,
+    int64_t groups,
+    bool with_bias);
+
 }  // namespace deconv
 }  // namespace dbl
 }  // namespace cpu

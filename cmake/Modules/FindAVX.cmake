@@ -21,8 +21,35 @@ SET(AVX512_BF16_CODE "
 
   int main() {
     __m512 src;
-    // detect avx512f and avx512bf16
+    // detect avx512vl and avx512bf16
     _mm512_cvtneps_pbh(src);
+    return 0;
+  }
+")
+
+SET(AVX512_VNNI_CODE "
+  #include <stdint.h>
+  #include <immintrin.h>
+
+  int main() {
+    char a1 = 1;
+    char a2 = 2;
+    char a3 = 0;
+    __m512i src1 = _mm512_set1_epi8(a1);
+    __m512i src2 = _mm512_set1_epi8(a2);
+    __m512i src3 = _mm512_set1_epi8(a3);
+    // detect avx512_vnni
+    _mm512_dpbusds_epi32(src3, src1, src2);
+    return src3[0];
+  }
+")
+
+SET(AMX_TILE_CODE "
+  #include <stdint.h>
+  #include <immintrin.h>
+  #include <emmintrin.h>
+  int main() {
+    _tile_release();
     return 0;
   }
 ")
@@ -55,8 +82,14 @@ MACRO(CHECK_SSE lang type flags)
   MARK_AS_ADVANCED(${lang}_${type}_FOUND ${lang}_${type}_FLAGS)
 ENDMACRO()
 
-CHECK_SSE(C "AVX512" " ;-mavx512f -mavx512bw -mavx512vl")
-CHECK_SSE(CXX "AVX512" " ;-mavx512f -mavx512bw -mavx512vl")
+CHECK_SSE(C "AVX512" " ;-mavx512f -mavx512bw -mavx512vl -mavx512dq")
+CHECK_SSE(CXX "AVX512" " ;-mavx512f -mavx512bw -mavx512vl -mavx512dq")
 
-CHECK_SSE(C "AVX512_BF16" " ;-mavx512f -mavx512bf16")
-CHECK_SSE(CXX "AVX512_BF16" " ;-mavx512f -mavx512bf16")
+CHECK_SSE(C "AVX512_BF16" " ;-mavx512vl -mavx512bf16")
+CHECK_SSE(CXX "AVX512_BF16" " ;-mavx512vl -mavx512bf16")
+
+CHECK_SSE(C "AVX512_VNNI" " ;-mavx512vnni")
+CHECK_SSE(CXX "AVX512_VNNI" " ;-mavx512vnni")
+
+CHECK_SSE(C "AMX_TILE" " ;-mamx-tile")
+CHECK_SSE(CXX "AMX_TILE" " ;-mamx-tile")

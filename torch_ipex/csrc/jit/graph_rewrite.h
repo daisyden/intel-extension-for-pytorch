@@ -23,6 +23,10 @@ void replaceConvolutionWithAtenConv(std::shared_ptr<Graph>& graph);
 void FuseConvolutionWithEltwise(std::shared_ptr<Graph>& graph);
 void FuseShuffle(std::shared_ptr<Graph>& graph);
 
+void FuseConvolutionWithInstanceNormAndRelu(std::shared_ptr<Graph>& graph);
+void ReplaceAtenCatWithIPEXCat(std::shared_ptr<Graph>& graph);
+void ReplaceAtenDeConvWithIPEXDeconv(std::shared_ptr<Graph>& graph);
+
 } // namespace graph_rewrite_helper
 } // namespace jit
 } // namespace torch

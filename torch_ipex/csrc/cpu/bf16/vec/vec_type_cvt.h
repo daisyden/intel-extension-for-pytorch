@@ -27,7 +27,7 @@ inline __m256i trunc_fp32_to_bf16(const __m512 src) {
 
 inline __m256i cvt_fp32_to_bf16(const __m512 src) {
 #if defined(AVX512_BF16)
-  return _mm512_cvtneps_pbh(src);
+  return (__m256i)_mm512_cvtneps_pbh(src);
 #else
   return trunc_fp32_to_bf16(src);
 #endif

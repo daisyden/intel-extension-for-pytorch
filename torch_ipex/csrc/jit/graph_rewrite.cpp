@@ -144,6 +144,113 @@ void FuseShuffle(std::shared_ptr<Graph>& graph) {
   rewriter_shuffle_2d.runOnGraph(graph);
 }
 
+std::unordered_map<std::string, c10::IValue> getInstNormParams(
+    const Match& match,
+    const std::unordered_map<std::string, Value*>& vmap) {
+  std::unordered_map<std::string, c10::IValue> calc_values;
+  const auto& match_vmap = match.values_map;
+  auto use_input_stats = getIValue("use_input_stats", match_vmap, vmap).value();
+  calc_values["use_input_stats"] = use_input_stats;
+  return calc_values;
+}
+
+
+void FuseConvolutionWithInstanceNormAndRelu(std::shared_ptr<Graph>& graph) {
+  std::string from_pattern = R"(
+      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[],
+              %transposed:bool, %output_padding:int[], %groups:int, %benchmark:bool,
+              %deterministic:bool, %cudnn_enabled:bool, %allow_tf32:bool,
+            %iw, %ib, %running_mean, %running_var, %use_input_stats:bool, %momentum:float,
+              %eps:float, %cudnn_enabled2:bool):
+        %r = aten::_convolution(%a, %w, %b, %stride, %padding, %dilation,
+            %transposed, %output_padding, %groups, %benchmark, %deterministic, %cudnn_enabled, %allow_tf32)
+        %s = aten::instance_norm(%r, %iw, %ib, %running_mean, %running_var,
+            %use_input_stats, %momentum, %eps, %cudnn_enabled2)
+        %t = aten::relu(%s)
+        return (%t) )";
+  std::string conv_instnorm_relu = R"(
+      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[],
+              %transposed:bool, %output_padding:int[], %groups:int, %benchmark:bool,
+              %deterministic:bool, %cudnn_enabled:bool, %allow_tf32:bool,
+            %iw, %ib, %running_mean, %running_var, %use_input_stats:bool, %momentum:float,
+              %eps:float, %cudnn_enabled2:bool):
+        %r = ipex::conv3d_instnorm_relu(%a, %w, %stride, %padding, %dilation, %groups,
+                                         %iw, %ib)
+        return (%r) )";
+
+  auto filter_conv3d = [](const Match& match,
+                          const std::unordered_map<std::string, Value*>& vmap) {
+    auto conv_value_map = getConvParams(match, vmap);
+    auto inorm_value_map = getInstNormParams(match, vmap);
+
+    if (conv_value_map["output_padding"].toIntList().size() != 3 ||
+        conv_value_map["stride"].toIntList().size() != 3 ||
+        conv_value_map["padding"].toIntList().size() != 3 ||
+        conv_value_map["dilation"].toIntList().size() != 3) {
+      return false;
+    }
+    return inorm_value_map["use_input_stats"].toBool() &&
+        !conv_value_map["transposed"].toBool() &&
+        (conv_value_map["output_padding"].toIntList()[0] == 0) &&
+        (conv_value_map["output_padding"].toIntList()[1] == 0) &&
+        (conv_value_map["output_padding"].toIntList()[2] == 0);
+  };
+  SubgraphRewriter conv3d_rewriter;
+  conv3d_rewriter.RegisterRewritePattern(from_pattern, conv_instnorm_relu);
+  conv3d_rewriter.runOnGraph(graph, filter_conv3d);
+}
+
+void ReplaceAtenDeConvWithIPEXDeconv(std::shared_ptr<Graph>& graph)
+{
+  std::string from_pattern = R"(
+      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[],
+              %transposed:bool, %output_padding:int[], %groups:int, %benchmark:bool,
+              %deterministic:bool, %cudnn_enabled:bool, %allow_tf32:bool):
+        %r = aten::_convolution(%a, %w, %b, %stride, %padding, %dilation,
+            %transposed, %output_padding, %groups, %benchmark, %deterministic, %cudnn_enabled, %allow_tf32)
+        return (%r) )";
+  std::string deconv = R"(
+      graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[],
+              %transposed:bool, %output_padding:int[], %groups:int, %benchmark:bool,
+              %deterministic:bool, %cudnn_enabled:bool, %allow_tf32:bool):
+        %r = ipex::deconv3d(%a, %w, %stride, %padding, %output_padding, %groups, %dilation)
+        return (%r) )";
+  
+  auto filter_conv_transpose3d =
+      [](const Match& match,
+         const std::unordered_map<std::string, Value*>& vmap) {
+        auto calc_value_map = getConvParams(match, vmap);
+        if (calc_value_map["output_padding"].toIntList().size() != 3 ||
+            calc_value_map["stride"].toIntList().size() != 3 ||
+            calc_value_map["padding"].toIntList().size() != 3 ||
+            calc_value_map["dilation"].toIntList().size() != 3) {
+          return false;
+        }
+        return calc_value_map["transposed"].toBool();
+      };
+
+  SubgraphRewriter deconv3d_rewriter;
+  deconv3d_rewriter.RegisterRewritePattern(from_pattern, deconv);
+  deconv3d_rewriter.runOnGraph(graph, filter_conv_transpose3d);
+}
+
+void ReplaceAtenCatWithIPEXCat(std::shared_ptr<Graph>& graph)
+{
+  std::string from_pattern = R"(
+      graph(%a, %axis):
+        %r = aten::cat(%a, %axis)
+        return (%r) )";
+        
+  std::string ipex_cat = R"(
+      graph(%a, %axis):
+        %r = ipex::cat(%a, %axis)
+        return (%r) )";
+
+  SubgraphRewriter cat_rewriter;
+  cat_rewriter.RegisterRewritePattern(from_pattern, ipex_cat);
+  cat_rewriter.runOnGraph(graph);
+}
+
 void FuseConvolutionWithEltwise(std::shared_ptr<Graph>& graph) {
   std::string conv2d_swish_fusion = R"(
       graph(%a, %w, %b, %stride:int[], %padding:int[], %dilation:int[], %groups:int):

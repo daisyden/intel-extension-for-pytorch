@@ -188,6 +188,75 @@ RegisterOperators op({
       },
       aliasAnalysisFromSchema()
       ),
+
+    Operator(
+      "ipex::conv3d_instnorm_relu(Tensor input, Tensor weight, int[3] stride, int[3] padding, int[3] dilation, int groups, Tensor in_weight, Tensor in_bias) -> Tensor",
+      [] (const Node* node) ->Operation {
+        if (torch_ipex::check_auto_dnnl()) {
+          return [] (Stack* stack) {
+            auto result = AtenIpexJITDev::dil_convolution_instancenorm_relu(
+                (std::move(peek(stack, 0, 8))).toTensor(),
+                (std::move(peek(stack, 1, 8))).toTensor(),
+                (std::move(peek(stack, 2, 8))).toIntVector(),
+                (std::move(peek(stack, 3, 8))).toIntVector(),
+                (std::move(peek(stack, 4, 8))).toIntVector(),
+                (std::move(peek(stack, 5, 8))).toInt(),
+                (std::move(peek(stack, 6, 8))).toTensor(),
+                (std::move(peek(stack, 7, 8))).toTensor());
+            drop(stack, 8);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        } else {
+          TORCH_CHECK(false, "PyTorch native path not support convolution relu fusion now for 3d case");
+        }
+      },
+      aliasAnalysisFromSchema()
+      ),
+
+    Operator(
+      "ipex::deconv3d(Tensor input, Tensor weight, int[3] stride, int[3] padding, int[3] output_padding, int groups, int[3] dilation) -> Tensor",
+      [] (const Node* node) ->Operation {
+        if (torch_ipex::check_auto_dnnl()) {
+          return [] (Stack* stack) {
+            auto result = AtenIpexJITDev::dil_deconvolution3d(
+                (std::move(peek(stack, 0, 7))).toTensor(),
+                (std::move(peek(stack, 1, 7))).toTensor(),
+                (std::move(peek(stack, 2, 7))).toIntVector(),
+                (std::move(peek(stack, 3, 7))).toIntVector(),
+                (std::move(peek(stack, 4, 7))).toIntVector(),
+                (std::move(peek(stack, 5, 7))).toInt(),
+                (std::move(peek(stack, 6, 7))).toIntVector());
+            drop(stack, 7);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        } else {
+          TORCH_CHECK(false, "PyTorch native path not support convolution relu fusion now for 3d case");
+        }
+      },
+      aliasAnalysisFromSchema()
+      ),
+    Operator(
+      "ipex::cat(Tensor[] inputs, int axis=1) -> Tensor",
+      [] (const Node* node) ->Operation {
+        if (torch_ipex::check_auto_dnnl()) {
+          return [] (Stack* stack) {
+            auto result = AtenIpexJITDev::dil_concat3d(
+                (std::move(peek(stack, 0, 2))).toTensorVector(),
+                (std::move(peek(stack, 1, 2))).toInt());
+            drop(stack, 2);
+            pack(stack, std::move(result));
+            return 0;
+          };
+        } else {
+          TORCH_CHECK(false, "PyTorch native path not support convolution relu fusion now for 3d case");
+        }
+      },
+      aliasAnalysisFromSchema()
+      ),
+ 
+
     Operator(
       "ipex::conv2d_sum(Tensor input, Tensor weight, Tensor? bias, int[2] stride, int[2] padding, int[2] dilation, int groups, Tensor(a!) accumu, *, Scalar alpha) -> Tensor(a!)",
       [] (const Node* node) ->Operation {

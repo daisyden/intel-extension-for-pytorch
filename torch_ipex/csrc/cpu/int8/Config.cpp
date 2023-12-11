@@ -167,11 +167,13 @@ Int8OptConfig::get_indicator_scales(std::vector<bool> i_uint8_used,
       inputs_scale[i] /= 127.5;
       inputs_scale[i] *= 255.5;
       scale_update = true;
+      inputs_uint8_used[i] = i_uint8_used[i];
     } else if (inputs_uint8_used[i] && !i_uint8_used[i]) {
       // update zero_point and scales
       inputs_scale[i] /= 255.5;
       inputs_scale[i] *= 127.5;
       scale_update = true;
+      inputs_uint8_used[i] = i_uint8_used[i];
     }
   }
   for (auto j = 0; j < o_uint8_used.size(); j++) {
@@ -180,11 +182,13 @@ Int8OptConfig::get_indicator_scales(std::vector<bool> i_uint8_used,
       outputs_scale[j] /= 127.5;
       outputs_scale[j] *= 255.5;
       scale_update = true;
+      outputs_uint8_used[j] = o_uint8_used[j];
     } else if (outputs_uint8_used[j] && !o_uint8_used[j]) {
       // update zero_point and scales
       outputs_scale[j] /= 255.5;
       outputs_scale[j] *= 127.5;
       scale_update = true;
+      outputs_uint8_used[j] = o_uint8_used[j];
     }
   }
   if (scale_update) {

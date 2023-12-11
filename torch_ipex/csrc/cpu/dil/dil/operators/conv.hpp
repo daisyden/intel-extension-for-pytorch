@@ -206,7 +206,7 @@ struct convolution_forward : public dnnl::convolution_forward {
       y_dims.push_back(out_size);
     }
     x_dtype = dtype == data_type::bf16 ? dtype : x_dtype;
-    auto y_dtype = dtype != data_type::s8 ? dtype : data_type::s32;
+    auto y_dtype = dtype != data_type::s8 ? dtype : data_type::s8;
     tensor::desc src_desc(x_dims, x_dtype);
     tensor::desc dst_desc(y_dims, y_dtype);
 

@@ -19,7 +19,7 @@ std::vector<int64_t> calc_deconv_input_size(
   auto dim = output_size.size();
   std::vector<int64_t> input_size(dim);
   input_size[0] = output_size[0];
-  input_size[1] = kernel_size[1] * groups;
+  input_size[1] = kernel_size[0] * groups;
   for (size_t d = 2; d < dim; ++d) {
     auto kernel = dilation[d - 2] * (kernel_size[d] - 1) + 1;
     input_size[d] = (output_size[d] - 1) * stride[d - 2] - (2 * padding[d - 2]) +
@@ -162,6 +162,54 @@ void prepack_deconv_weights(
     dil::tensor packed_weight {packed_desc};
     packed_weight.feed_from(dil_weight, /*is_deconv_weights=*/true);
     dbl::comm::equip_dil_buffer(weight, packed_weight);
+  }
+}
+
+void prepack_deconv3d_weights(
+    const at::Tensor& input,
+    const at::Tensor& weight,
+    at::IntArrayRef stride,
+    at::IntArrayRef padding,
+    std::vector<int64_t> padding_r, 
+    at::IntArrayRef output_padding,
+    at::IntArrayRef dilation,
+    int64_t groups,
+    bool with_bias) {
+  // Prepack weight tensor if it's either a *cpu tensor* or a *plain dil tensor*
+  //
+  // Note: weight tensor will not be re-packed unless user has implicitly
+  //       triggered `to_public` by accessing its data
+  //       One caveat is when the input size has changed and prepacked weight
+  //       might not be the best fit for new input size, the weight will not
+  //       be re-packed in such cases, but it still ensures the correctness
+  //
+  // TODO: once semantics of "own shade context" is equivalent to
+  //       "is dil tensor", we could remove the first check below
+  if (!cpu::ShadeDataContext::isPackedTensor(weight)) {
+
+    auto dil_weight = dbl::comm::try_gen_dil_tensor(weight);
+    auto output_sizes = calc_deconv_input_size(input.sizes(), weight.sizes(), padding, output_padding, stride, dilation, groups);
+    auto packed_desc = dil::convolution_transpose_forward::expected_weights_desc(
+        weight.sizes().vec(),
+        dil_weight.get_data_type(),
+        stride.vec(),
+        padding.vec(),
+        padding_r,
+        dilation.vec(),
+        groups,
+        dil::algorithm::deconvolution_direct,
+        dil::prop_kind::forward,
+        input.sizes().vec(),
+        output_sizes,
+        with_bias);
+
+    dil::tensor packed_weight {packed_desc};
+    if (dil_weight.has_scale()) {
+      packed_weight.set_scale(dil_weight.get_scale());
+    }
+    packed_weight.feed_from(dil_weight);
+    dbl::comm::equip_dil_buffer(weight, packed_weight);
+    cpu::ShadeDataContext::setPackedTensor(weight, true);
   }
 }
 
