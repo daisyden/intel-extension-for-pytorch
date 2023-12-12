@@ -462,9 +462,9 @@ at::Tensor AtenIpexJITDev::dil_deconvolution3d(
     attr.set_output_scales(2, op_scales);
   }
 
-#if defined(IPEX_PROFILE_OP)
-  RECORD_FUNCTION("dbl::deconv::deconvolution_impl", std::vector<c10::IValue>({}));
-#endif
+//#if defined(IPEX_PROFILE_OP)
+//  RECORD_FUNCTION("dbl::deconv::deconvolution_impl", std::vector<c10::IValue>({}));
+//#endif
   dil::tensor dil_output = dbl::deconv::deconvolution_impl(dil_input, dil_weight, dil_bias, padding, padding_r, output_padding, stride, dilation, groups, attr);
   auto aten_output = dbl::comm::gen_aten_tensor_by(std::move(dil_output));
 
